@@ -20,6 +20,10 @@ button.active{background:#087e69;border-color:#20b99c}button:disabled{opacity:.4
 #notice{font-size:11px;color:#d8e6ed;min-height:18px;margin:7px 2px 0}
 #hint{position:absolute;top:116px;left:50%;transform:translateX(-50%);z-index:2;background:rgba(15,30,40,.78);padding:6px 10px;border-radius:20px;font-size:10px;color:#d9e7ee;white-space:nowrap}
 #toggle{position:absolute;right:12px;top:118px;z-index:4;background:#172b3a}
+#confirmLayer{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:20px}
+#confirmBox{width:min(360px,100%);background:#172b3a;border:1px solid #62839a;border-radius:16px;padding:18px;box-shadow:0 18px 60px rgba(0,0,0,.45)}
+#confirmBox h2{font-size:18px;margin:0 0 8px}#confirmBox p{font-size:13px;line-height:1.5;color:#d1e0e8;margin:7px 0}
+#confirmActions{display:flex;gap:9px;margin-top:15px}#confirmActions button{flex:1;font-size:13px}#confirmBuild{background:#087e69;border-color:#20b99c}#confirmLayer.show{display:flex}
 @media(min-width:760px){.topbar{max-width:620px;right:auto;width:620px}.panel{left:auto;width:390px;right:14px;max-height:70vh;bottom:14px}.stats{grid-template-columns:repeat(4,1fr)}#hint{top:100px}}
 </style>
 </head>
@@ -33,6 +37,14 @@ button.active{background:#087e69;border-color:#20b99c}button:disabled{opacity:.4
 </div>
 <div id="hint">Drag to rotate • Pinch to zoom • Tap terrain to build</div>
 <button id="toggle">Hide menu</button>
+<div id="confirmLayer" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+ <div id="confirmBox">
+  <h2 id="confirmTitle">Confirm construction</h2>
+  <p id="confirmText">Do you want to build this?</p>
+  <p id="confirmCost"></p>
+  <div id="confirmActions"><button id="cancelBuild">Cancel</button><button id="confirmBuild">Confirm</button></div>
+ </div>
+</div>
 <div class="panel" id="panel">
  <div class="panelhead"><strong>🏗️ Construction & Government</strong><span id="pollutionLabel" style="font-size:11px;color:#b9d5c5">Pollution 0%</span></div>
  <div class="tools" id="buildTools">
@@ -145,19 +157,38 @@ function updateUI(){
  document.getElementById('pollutionLabel').textContent='Pollution '+pollution+'%';
 }
 function note(t){document.getElementById('notice').textContent=t}
+let pendingAction=null;
+function askConfirmation(title,description,cost,action){
+ document.getElementById('confirmTitle').textContent=title;
+ document.getElementById('confirmText').textContent=description;
+ document.getElementById('confirmCost').textContent=cost;
+ pendingAction=action;document.getElementById('confirmLayer').classList.add('show');
+}
+function closeConfirmation(){document.getElementById('confirmLayer').classList.remove('show');pendingAction=null}
+document.getElementById('cancelBuild').onclick=()=>{closeConfirmation();note('Action cancelled. Nothing was changed.')};
+document.getElementById('confirmBuild').onclick=()=>{const action=pendingAction;closeConfirmation();if(action)action()};
+document.getElementById('confirmLayer').addEventListener('click',e=>{if(e.target.id==='confirmLayer'){closeConfirmation();note('Action cancelled. Nothing was changed.')}});
 function placeAt(x,z){
  const existing=objects.find(o=>o.x===x&&o.z===z);
- if(isErasing){if(!existing){note('No building on this plot.');return}scene.remove(existing.group);objects=objects.filter(o=>o!==existing);money+=Math.round((costs[existing.type]||0)*.25);population=Math.max(0,population-(existing.type==='house'?20:existing.type==='apartment'?65:existing.type==='tower'?150:0));note('Building removed. Partial refund credited.');updateUI();return}
+ if(isErasing){
+  if(!existing){note('No building on this plot.');return}
+  askConfirmation('Remove '+labels[existing.type]+'?', 'Are you sure you want to remove this '+labels[existing.type]+'?', 'Refund: ₹'+Math.round((costs[existing.type]||0)*.25).toLocaleString('en-IN'), ()=>{
+   scene.remove(existing.group);objects=objects.filter(o=>o!==existing);money+=Math.round((costs[existing.type]||0)*.25);population=Math.max(0,population-(existing.type==='house'?20:existing.type==='apartment'?65:existing.type==='tower'?150:0));note('Building removed. Partial refund credited.');updateUI();
+  });return;
+ }
  if(existing){note('Plot occupied. Remove the existing building first.');return}
  const cost=costs[selected];if(money<cost){note('Not enough treasury funds.');return}
- money-=cost;makeBuilding(selected,x,z);
- if(selected==='house')population+=20;
- if(selected==='apartment')population+=65;
- if(selected==='tower')population+=150;
- if(selected==='farm')jobs=Math.min(100,jobs+3);
- if(selected==='factory'){jobs=Math.min(100,jobs+8);pollution=Math.min(100,pollution+8)}
- if(selected==='forest')pollution=Math.max(0,pollution-4);
- note(labels[selected]+' constructed successfully.');updateUI();
+ askConfirmation('Confirm '+labels[selected]+' construction?', 'Do you want to construct a '+labels[selected]+' on this plot?', 'Construction cost: ₹'+cost.toLocaleString('en-IN')+'  •  Treasury after build: ₹'+(money-cost).toLocaleString('en-IN'), ()=>{
+  if(money<cost){note('Not enough treasury funds.');return}
+  money-=cost;makeBuilding(selected,x,z);
+  if(selected==='house')population+=20;
+  if(selected==='apartment')population+=65;
+  if(selected==='tower')population+=150;
+  if(selected==='farm')jobs=Math.min(100,jobs+3);
+  if(selected==='factory'){jobs=Math.min(100,jobs+8);pollution=Math.min(100,pollution+8)}
+  if(selected==='forest')pollution=Math.max(0,pollution-4);
+  note(labels[selected]+' constructed successfully.');updateUI();
+ });
 }
 renderer.domElement.addEventListener('pointerdown',e=>{
  const rect=renderer.domElement.getBoundingClientRect();
