@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INDIA SIMULATOR</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101820;color:white;font-family:Arial,sans-serif}
+header{background:#172b3a;padding:14px;text-align:center}
+header h2{margin:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px}
+.stat{background:#24394a;padding:10px;border-radius:9px;text-align:center;font-size:12px}
+.stat b{display:block;font-size:17px;margin-top:5px}
+main{padding:10px}
+#world{width:100%;height:390px;background:#83b5c5;border:2px solid #476b70;border-radius:12px;display:block;touch-action:manipulation}
+h3{margin-bottom:8px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+button{background:#263f50;color:white;border:1px solid #54758a;border-radius:9px;padding:12px 5px;font-size:13px}
+button:active{background:#167b69}
+.active{background:#087e69}
+#message{background:#20394a;padding:12px;border-radius:8px;min-height:40px}
+.footer{padding:10px;text-align:center;color:#9bb1c0;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+<h2>🇮🇳 INDIA SIMULATOR</h2>
+<small>Build your own Indian civilization</small>
+</header>
+
+<div class="stats">
+<div class="stat">💰 TREASURY<b id="money">₹1,00,000</b></div>
+<div class="stat">👨‍👩‍👧 POPULATION<b id="people">500</b></div>
+<div class="stat">💼 EMPLOYMENT<b id="jobs">35%</b></div>
+<div class="stat">🏭 INDUSTRY<b id="industry">0</b></div>
+<div class="stat">🌳 POLLUTION<b id="pollution">0%</b></div>
+<div class="stat">📅 DAY<b id="day">1</b></div>
+</div>
+
+<main>
+<h3>🗺️ MALWA REGION</h3>
+<canvas id="world"></canvas>
+
+<h3>🏗️ Construction Menu</h3>
+<div class="tools" id="tools">
+<button data-type="house">🏠 House<br>₹5,000</button>
+<button data-type="apartment">🏢 Apartment<br>₹12,000</button>
+<button data-type="tower">🏙️ Skyscraper<br>₹30,000</button>
+<button data-type="farm">🌾 Farm<br>₹8,000</button>
+<button data-type="factory">🏭 Factory<br>₹20,000</button>
+<button data-type="road">🛣️ Road<br>₹2,000</button>
+<button data-type="forest">🌳 Forest<br>₹1,000</button>
+<button data-type="water">💧 Water Tank<br>₹4,000</button>
+<button data-type="erase">🧹 Remove</button>
+</div>
+
+<h3>🌱 Terrain Tools</h3>
+<div class="tools" id="terrains">
+<button data-type="grass">🟩 Grass</button>
+<button data-type="black">⬛ Black Soil</button>
+<button data-type="red">🟥 Red Soil</button>
+<button data-type="sand">🟨 Sandy Soil</button>
+<button data-type="water">🌊 Water</button>
+<button data-type="forest">🌲 Forest</button>
+</div>
+
+<h3>📊 Government</h3>
+<div class="tools">
+<button onclick="collectTax()">Collect Taxes</button>
+<button onclick="nextDay()">Next Day</button>
+<button onclick="saveGame()">💾 Save</button>
+<button onclick="loadGame()">📂 Load</button>
+</div>
+
+<p id="message">Welcome, Chief Minister! Select a building and tap a tile.</p>
+</main>
+
+<div class="footer">INDIA SIMULATOR • Development Prototype V1</div>
+
+<script>
+const canvas=document.getElementById("world");
+const ctx=canvas.getContext("2d");
+const COLS=10,ROWS=9;
+let money=100000,people=500,jobs=35,pollution=0,day=1;
+let selected="house",taxRate=10;
+let grid=[];
+
+const buildings={
+ house:{cost:5000,pop:20,job:1,poll:0,color:"#e8d4a0",emoji:"🏠"},
+ apartment:{cost:12000,pop:65,job:3,poll:1,color:"#b6c9d8",emoji:"🏢"},
+ tower:{cost:30000,pop:150,job:10,poll:3,color:"#8aa9c0",emoji:"🏙️"},
+ farm:{cost:8000,pop:5,job:12,poll:0,color:"#a5c75d",emoji:"🌾"},
+ factory:{cost:20000,pop:5,job:30,poll:12,color:"#87939a",emoji:"🏭"},
+ road:{cost:2000,pop:0,job:0,poll:0,color:"#555e65",emoji:"🛣️"},
+ forest:{cost:1000,pop:0,job:0,poll:-3,color:"#347b45",emoji:"🌳"},
+ water:{cost:4000,pop:0,job:2,poll:0,color:"#4ba7ce",emoji:"💧"}
+};
+
+function init(){
+ grid=Array.from({length:ROWS},()=>Array.from({length:COLS},()=>({type:"grass"})));
+ resize();
+}
+function resize(){
+ const dpr=window.devicePixelRatio||1;
+ const rect=canvas.getBoundingClientRect();
+ canvas.width=rect.width*dpr;
+ canvas.height=rect.height*dpr;
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ draw();
+}
+function draw(){
+ const w=canvas.clientWidth,h=canvas.clientHeight;
+ const tw=w/COLS,th=h/ROWS;
+ ctx.clearRect(0,0,w,h);
+ for(let y=0;y<ROWS;y++){
+  for(let x=0;x<COLS;x++){
+   const cell=grid[y][x],type=cell.type;
+   let colors={grass:"#83aa60",black:"#514b3e",red:"#a95e43",sand:"#c6ad6c",water:"#318eb9",forest:"#39774a"};
+   let color=colors[type]|| (buildings[type]&&buildings[type].color)||"#83aa60";
+   ctx.fillStyle=color;
+   ctx.fillRect(x*tw,y*th,tw,th);
+   ctx.strokeStyle="rgba(255,255,255,.25)";
+   ctx.strokeRect(x*tw,y*th,tw,th);
+   if(buildings[type]){
+    ctx.font=Math.min(tw*.48,25)+"px Arial";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText(buildings[type].emoji,x*tw+tw/2,y*th+th/2);
+   }
+  }
+ }
+}
+function update(){
+ document.getElementById("money").textContent="₹"+money.toLocaleString("en-IN");
+ document.getElementById("people").textContent=people.toLocaleString("en-IN");
+ document.getElementById("jobs").textContent=jobs+"%";
+ document.getElementById("pollution").textContent=pollution+"%";
+ document.getElementById("day").textContent=day;
+ document.getElementById("industry").textContent=grid.flat().filter(c=>c.type==="factory").length;
+}
+function message(t){document.getElementById("message").textContent=t}
+function select(type){
+ selected=type;
+ document.querySelectorAll("button[data-type]").forEach(b=>b.classList.toggle("active",b.dataset.type===type));
+ message("Selected: "+type+". Now tap a map tile.");
+}
+document.querySelectorAll("#tools button").forEach(b=>b.onclick=()=>select(b.dataset.type));
+document.querySelectorAll("#terrains button").forEach(b=>b.onclick=()=>select(b.dataset.type));
+
+canvas.addEventListener("click",e=>{
+ const r=canvas.getBoundingClientRect();
+ const x=Math.floor((e.clientX-r.left)/(r.width/COLS));
+ const y=Math.floor((e.clientY-r.top)/(r.height/ROWS));
+ if(x<0||y<0||x>=COLS||y>=ROWS)return;
+ const old=grid[y][x].type;
+ if(selected==="erase"){
+  if(buildings[old]){
+   const b=buildings[old];
+   people=Math.max(0,people-b.pop);
+   money+=Math.floor(b.cost*.25);
+  }
+  grid[y][x]={type:"grass"};
+ }else if(buildings[selected]){
+  if(buildings[old]){
+   message("This tile is already occupied. Remove it first.");
+   return;
+  }
+  const b=buildings[selected];
+  if(money<b.cost){message("Not enough treasury funds!");return;}
+  money-=b.cost;
+  people+=b.pop;
+  jobs=Math.min(100,jobs+b.job);
+  pollution=Math.max(0,Math.min(100,pollution+b.poll));
+  grid[y][x]={type:selected};
+ }else{
+  if(buildings[old]){message("Remove the building before changing terrain.");return;}
+  grid[y][x]={type:selected};
+ }
+ draw();update();
+ message("Map updated successfully!");
+});
+
+function collectTax(){
+ let income=Math.floor(people*taxRate);
+ money+=income;
+ update();
+ message("Government collected ₹"+income.toLocaleString("en-IN")+" in taxes.");
+}
+function nextDay(){
+ day++;
+ let income=Math.floor(people*.5+jobs*20);
+ money+=income;
+ people+=Math.floor(people*.01);
+ pollution=Math.max(0,pollution-1);
+ update();
+ message("Day "+day+": Population and economy updated. Daily income ₹"+income.toLocaleString("en-IN"));
+}
+function saveGame(){
+ const data={money,people,jobs,pollution,day,grid};
+ localStorage.setItem("indiaSimulatorSave",JSON.stringify(data));
+ message("Game saved successfully on this device!");
+}
+function loadGame(){
+ const raw=localStorage.getItem("indiaSimulatorSave");
+ if(!raw){message("No saved game found.");return;}
+ try{
+  const d=JSON.parse(raw);
+  money=d.money;people=d.people;jobs=d.jobs;
+  pollution=d.pollution;day=d.day;grid=d.grid;
+  draw();update();message("Saved game loaded!");
+ }catch(e){message("Save file could not be loaded.");}
+}
+window.addEventListener("resize",resize);
+init();update();
+</script>
+</body>
+</html>
